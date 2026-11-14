@@ -1,0 +1,351 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rimana Ayni</title>
+    <style>
+      :root {
+        --bg: #edf4f3;
+        --panel: #ffffff;
+        --primary: #4f8a8b;
+        --text: #1d2b2b;
+        --muted: #5c6d6d;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, #edf7f6 0%, #f8fbfb 100%);
+        font-family: Arial, Helvetica, sans-serif;
+        color: var(--text);
+      }
+
+      .app {
+        width: min(92vw, 820px);
+        background: var(--panel);
+        border-radius: 28px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+        padding: 24px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        text-align: center;
+        color: var(--primary);
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      button {
+        border: none;
+        border-radius: 14px;
+        padding: 14px 20px;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #cameraBtn {
+        background: var(--primary);
+        color: white;
+      }
+
+      #speakBtn {
+        background: #dff3ee;
+        color: var(--text);
+      }
+
+      .status {
+        text-align: center;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+
+      .video-box {
+        position: relative;
+        width: 100%;
+        max-width: 760px;
+        margin: 0 auto;
+        border-radius: 24px;
+        overflow: hidden;
+        background: #000;
+        aspect-ratio: 16 / 9;
+      }
+
+      video {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background: #000;
+      }
+
+      .result {
+        margin-top: 18px;
+        text-align: center;
+        font-weight: 800;
+        font-size: clamp(1.3rem, 2vw, 2rem);
+      }
+
+      .hint {
+        margin-top: 10px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <h1>Rimana Ayni</h1>
+
+      <div class="controls">
+        <button id="cameraBtn">Activar cámara</button>
+        <button id="speakBtn">Decir resultado</button>
+      </div>
+
+      <div id="status" class="status">Cámara apagada</div>
+
+      <div class="video-box">
+        <video id="video" autoplay playsinline muted></video>
+      </div>
+
+      <div id="result" class="result">Señal: sin detección</div>
+      <div class="hint">Muestra una seña frente a la cámara y la laptop la dirá en voz.</div>
+    </div>
+
+    <script>
+      const video = document.getElementById('video');
+      const statusEl = document.getElementById('status');
+      const resultEl = document.getElementById('result');
+      const cameraBtn = document.getElementById('cameraBtn');
+      const speakBtn = document.getElementById('speakBtn');
+
+      const referenceLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+      const templates = buildReferenceTemplates(referenceLabels);
+
+      let stream = null;
+      let lastLabel = 'sin detección';
+      let started = false;
+
+      function buildReferenceTemplates(labels) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d');
+        const result = [];
+
+        for (const label of labels) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#000000';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = 'bold 110px Arial';
+          ctx.fillText(label, canvas.width / 2, canvas.height / 2 + 8);
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const mask = new Uint8Array(canvas.width * canvas.height);
+
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            const brightness = (r + g + b) / 3;
+            mask[i / 4] = brightness < 180 ? 1 : 0;
+          }
+
+          result.push({
+            label,
+            mask: normalizeMask(mask, canvas.width, canvas.height, 32, 18)
+          });
+        }
+
+        return result;
+      }
+
+      function normalizeMask(mask, width, height, targetWidth, targetHeight) {
+        const active = [];
+
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const index = y * width + x;
+            if (mask[index] === 1) {
+              active.push({ x, y });
+            }
+          }
+        }
+
+        if (active.length === 0) {
+          return new Array(targetWidth * targetHeight).fill(0);
+        }
+
+        let minX = width;
+        let minY = height;
+        let maxX = -1;
+        let maxY = -1;
+
+        for (const point of active) {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        }
+
+        const pad = 12;
+        const startX = Math.max(0, minX - pad);
+        const startY = Math.max(0, minY - pad);
+        const endX = Math.min(width - 1, maxX + pad);
+        const endY = Math.min(height - 1, maxY + pad);
+        const cropWidth = Math.max(1, endX - startX + 1);
+        const cropHeight = Math.max(1, endY - startY + 1);
+        const normalized = new Array(targetWidth * targetHeight).fill(0);
+
+        for (let y = 0; y < targetHeight; y += 1) {
+          for (let x = 0; x < targetWidth; x += 1) {
+            const srcX = startX + Math.floor((x / targetWidth) * cropWidth);
+            const srcY = startY + Math.floor((y / targetHeight) * cropHeight);
+            const srcIndex = srcY * width + srcX;
+            normalized[y * targetWidth + x] = mask[srcIndex] || 0;
+          }
+        }
+
+        return normalized;
+      }
+
+      function frameToMask(video, canvas, ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const mask = new Uint8Array(canvas.width * canvas.height);
+
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          const r = imageData.data[i];
+          const g = imageData.data[i + 1];
+          const b = imageData.data[i + 2];
+          const brightness = (r + g + b) / 3;
+          const skin = r > 80 && g > 30 && b > 15 && r > g && r > b && Math.abs(r - g) > 15;
+          mask[i / 4] = skin || brightness < 60 ? 1 : 0;
+        }
+
+        return normalizeMask(mask, canvas.width, canvas.height, 32, 18);
+      }
+
+      function compareSimilarity(frameMask, templateMask) {
+        let diff = 0;
+
+        for (let i = 0; i < frameMask.length; i += 1) {
+          diff += Math.abs(frameMask[i] - templateMask[i]);
+        }
+
+        return diff;
+      }
+
+      function recognizeMostSimilar(frameMask) {
+        let bestLabel = 'sin detección';
+        let bestScore = Infinity;
+
+        for (const template of templates) {
+          const score = compareSimilarity(frameMask, template.mask);
+          if (score < bestScore) {
+            bestScore = score;
+            bestLabel = template.label;
+          }
+        }
+
+        if (bestScore > 240) {
+          return 'sin detección';
+        }
+
+        return bestLabel;
+      }
+
+      function speakText(text) {
+        if (!('speechSynthesis' in window)) {
+          statusEl.textContent = 'Tu navegador no tiene voz del sistema';
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'es-ES';
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utterance);
+      }
+
+      async function activateCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          statusEl.textContent = 'Este navegador no soporta la cámara';
+          return;
+        }
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false,
+          });
+
+          video.srcObject = stream;
+          await video.play();
+          statusEl.textContent = 'Cámara activa';
+
+          if (!started) {
+            startDetection();
+            started = true;
+          }
+        } catch (error) {
+          statusEl.textContent = 'Debes permitir acceso a la cámara del navegador';
+        }
+      }
+
+      function startDetection() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 320;
+        canvas.height = 180;
+
+        const tick = () => {
+          if (video.readyState >= 2 && !video.paused) {
+            const frameMask = frameToMask(video, canvas, ctx);
+            const label = recognizeMostSimilar(frameMask);
+
+            if (label !== 'sin detección') {
+              resultEl.textContent = 'Señal: ' + label;
+              if (lastLabel !== label) {
+                lastLabel = label;
+                speakText(label);
+              }
+            } else {
+              resultEl.textContent = 'Señal: sin detección';
+              lastLabel = 'sin detección';
+            }
+          }
+
+          requestAnimationFrame(tick);
+        };
+
+        requestAnimationFrame(tick);
+      }
+
+      cameraBtn.addEventListener('click', activateCamera);
+      speakBtn.addEventListener('click', () => {
+        const text = resultEl.textContent.replace('Señal: ', '') || 'sin detección';
+        speakText(text);
+      });
+    </script>
+  </body>
+</html>

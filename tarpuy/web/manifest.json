@@ -1,0 +1,19 @@
+{
+    "name": "TARPUY · Inteligencia agrícola",
+    "short_name": "TARPUY",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F5F5EF",
+    "theme_color": "#173E32",
+    "description": "Inteligencia agrícola para sembrar hoy, regenerar mañana.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}
