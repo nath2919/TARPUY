@@ -1,0 +1,9 @@
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
+import { Sprout } from 'lucide-react';
+import { useFarm } from '../context/FarmContext';
+const steps = [['/campo', 'Tu campo'], ['/diagnostico', 'Diagnóstico'], ['/prioridades', 'Prioridades'], ['/comparador', 'Rotaciones'], ['/recomendacion', 'Tu plan']];
+export function Layout() {
+  const location = useLocation();
+  const { storageError } = useFarm();
+  return <div className="min-h-screen"><header className="border-b border-forest/10 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-5 md:px-10"><Link to="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight"><span className="rounded-xl bg-forest p-2 text-leaf"><Sprout size={23}/></span>SoilShift<span className="text-earth">.</span></Link><span className="badge">DEMO · DATOS MOCK</span></div></header>{location.pathname !== '/' && <nav aria-label="Pasos del análisis" className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-5 py-5 md:px-10">{steps.map(([path, label], i) => <NavLink key={path} to={path} className={({ isActive }) => 'step ' + (isActive ? 'bg-forest text-white' : 'bg-white text-slate-500')}><span className="mr-2 opacity-60">0{i + 1}</span>{label}</NavLink>)}</nav>}<main className="mx-auto max-w-7xl px-5 pb-16 pt-6 md:px-10">{storageError && <p role="status" className="mb-5 rounded-xl bg-amber-100 p-4">No se pudieron guardar los cambios. Se conservan durante esta sesión.</p>}<Outlet/></main><footer className="mx-auto flex max-w-7xl flex-wrap justify-between gap-3 border-t border-forest/10 px-5 py-7 text-xs text-slate-500 md:px-10"><span>SoilShift / Decisiones que echan raíces.</span><span>Inspirado en observación terrestre NASA · Prototipo</span></footer></div>;
+}

@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer base {
+  body { @apply m-0 bg-mist font-sans text-forest antialiased; }
+  button, a, input, select, summary { @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#547e9c]; }
+  button { @apply disabled:cursor-not-allowed disabled:opacity-40; }
+  ::selection { background: #d6e9ae; color: #173f35; }
+}
+@layer components {
+  .card { @apply rounded-2xl border border-forest/10 bg-white p-6; }
+  .button { @apply inline-flex items-center justify-center gap-3 rounded-xl bg-forest px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-[#295a49]; }
+  .button-secondary { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-forest/20 bg-white px-5 py-3.5 text-sm font-medium transition-colors hover:bg-leaf/40; }
+  .badge { @apply inline-flex items-center gap-1 rounded-full bg-[#eaf0df] px-3 py-1.5 text-[10px] font-semibold tracking-wide text-forest; }
+  .eyebrow { @apply text-xs font-semibold tracking-[0.16em] text-[#6a854a]; }
+  .label { @apply mb-2 block text-sm font-medium; }
+  .input { @apply w-full rounded-xl border border-forest/20 bg-white px-4 py-3 text-sm; }
+  .step { @apply whitespace-nowrap rounded-full px-4 py-2.5 text-xs font-medium transition-colors; }
+}
+.landscape { background: linear-gradient(160deg, #9eb3a0 0%, #ced7b5 23%, #88975b 24%, #88975b 41%, #acb77b 42%, #acb77b 57%, #536a40 58%, #536a40 73%, #a69a66 74%); }
+.field-lines { position: absolute; inset: -30%; transform: rotate(-22deg); background: repeating-linear-gradient(90deg, transparent 0 21px, #ffffff24 22px 24px, transparent 25px 44px); }
+.leaflet-container { z-index: 0; font-family: inherit; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
